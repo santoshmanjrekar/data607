@@ -1,0 +1,25 @@
+[
+  {
+  "AuthorFirstName": "Satya",
+  "AuthorLastName": "Nadella",
+  "Title": "Hit Refresh",
+  "Year": "2017",
+  "Subject": "Autobiography",
+  "BookType": "Hardcover"
+},
+{
+  "AuthorFirstName": "Robert",
+  "AuthorLastName": "Lagdon",
+  "Title": "The DA Vinci Code",
+  "Year": "2009",
+  "Subject": "Fiction",
+  "BookType": "Paperback"
+},
+{
+  "AuthorFirstName": "J.K.",
+  "AuthorLastName": "Rowling",
+  "Title": "Harry Potter and the Philosopher's stone",
+  "Year": "2015",
+  "Subject": "Autobiography",
+  "BookType": "Kindle"
+}]
