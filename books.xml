@@ -1,0 +1,26 @@
+<book_table>
+<book>
+  <AuthorFirstName>Satya</AuthorFirstName>
+  <AuthorLastName>Nadella</AuthorLastName>
+  <Title>Hit Refresh</Title>
+  <Year>2017</Year>
+  <subject>Autobiography</subject>
+  <BookType>Hardcover</BookType>
+</book>
+<book>
+  <AuthorFirstName>Robert</AuthorFirstName>
+  <AuthorLastName>Lagdon</AuthorLastName>
+  <Title>The DA Vinci Code</Title>
+  <Year>2009</Year>
+  <subject>Fiction</subject>
+  <BookType>Paperback</BookType>
+</book>
+<book>
+  <AuthorFirstName>J.K.</AuthorFirstName>
+  <AuthorLastName>Rowling</AuthorLastName>
+  <Title>Harry Potter and the Philosopher's stone</Title>
+  <Year>2015</Year>
+  <subject>Fiction</subject>
+  <BookType>Kindle Version</BookType>
+</book>
+</book_table>
