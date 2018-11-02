@@ -1,0 +1,215 @@
+---
+title: "DATA 607 Project 4"
+author: "Santosh Manjrekar"
+date: "November 1, 2017"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    code_folding: hide
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Project Goals
+
+Our task is to create a program that can classify a text document using training documents that are already classified. Specifically we will make a program that will classify email as 'spam' - unwanted email, or 'ham' wanted email.
+
+To that end will will set up the necessary libraries.
+
+```{r libraries, eval=TRUE}
+suppressMessages(suppressWarnings(library("tm")))
+suppressMessages(suppressWarnings(library("RTextTools")))
+suppressMessages(suppressWarnings(library("tidyverse")))
+suppressMessages(suppressWarnings(library("stringr")))
+suppressMessages(suppressWarnings(library("SnowballC")))
+suppressMessages(suppressWarnings(library("wordcloud")))
+```
+
+## The Data
+
+We retrieved files of spam and ham emails from http://spamassassin.apache.org/old/publiccorpus/
+specifically 20050311_spam_2.tar.bz2 and 20030228_easy_ham.tar.bz2
+
+These were unpacked into the following directories.
+
+```{r dir, eval=TRUE}
+spam_dir <- 'C:\\santosh\\learning\\CUNY\\courses\\DATA607\\project4\\spam_2\\'
+ham_dir <- 'C:\\santosh\\learning\\CUNY\\courses\\DATA607\\project4\\easy_ham\\'
+```
+
+We then need to create text Corpuses from the files. The 'for' loops are needed to classify each individual document as ham or spam. The tidying procedures are similar to those found in the course text. VCorpus seems to perform better with the content_transformer() function wrapped around the tm_map variables.
+
+```{r corp, eval=TRUE}
+spam <- spam_dir %>% DirSource() %>% VCorpus()
+ham <- ham_dir %>% DirSource() %>% VCorpus()
+meta(spam[[1]])
+meta(ham[[1]])
+#Now we can tidy our Corpuses
+spam <- spam %>% tm_map(content_transformer(PlainTextDocument))
+spam <- spam %>% tm_map(content_transformer(removePunctuation))
+spam <- spam %>% tm_map(content_transformer(tolower))
+spam <- spam %>% tm_map(content_transformer(removeNumbers))
+spam <- spam %>% tm_map(content_transformer(stemDocument),  language = 'english') #Stemming seems to truncate words
+spam <- spam %>% tm_map(removeWords, c('receiv', stopwords('english')))
+ham <- ham %>% tm_map(content_transformer(PlainTextDocument))
+ham <- ham %>% tm_map(content_transformer(removePunctuation))
+ham <- ham %>% tm_map(content_transformer(tolower))
+ham <- ham %>% tm_map(content_transformer(removeNumbers))
+ham <- ham %>% tm_map(content_transformer(stemDocument),  language = 'english') #Stemming seems to truncate words
+ham <- ham %>% tm_map(removeWords, c('receiv', 'spamassassin', stopwords('english')))
+ham_spam <- c(ham,spam)
+#This loop places a meta data label on all documents as ham or spam, the c() function puts the two Corpuses back to Back
+#So we can use their lengths to index the loops.
+for(i in 1:length(ham)){
+  meta(ham_spam[[i]],"classification") <- "Ham"
+}
+for(i in (length(ham)+1):(length(spam)+length(ham))){
+  meta(ham_spam[[i]],"classification") <- "Spam"
+}
+for(i in 1:5){
+  ham_spam <- sample(ham_spam)
+}# This scramble the corpus so it is not all Ham then all Spam
+meta(ham_spam[[127]])
+# You can un comment the lines below to read individual emails.
+#ham[[1]] %>% as.character() %>% writeLines()
+#spam[[1]] %>% as.character() %>% writeLines()
+```
+
+##Document Term Matrices
+
+Document Term  Matrices are useful in applying statistical methods to text documents. We can use the tm library to create TMD form the ham and spam Corpuses.
+
+```{r tdm, eval=TRUE}
+spam_dtm <- spam %>% DocumentTermMatrix()
+spam_dtm
+spam_dtm <- spam_dtm %>% removeSparseTerms(1-(10/length(spam)))
+spam_dtm
+ham_dtm <- ham %>% DocumentTermMatrix()
+ham_dtm
+ham_dtm <- ham_dtm %>% removeSparseTerms(1-(10/length(ham)))
+ham_dtm
+ham_spam_dtm <- ham_spam %>% DocumentTermMatrix()
+ham_spam_dtm <- ham_spam_dtm %>% removeSparseTerms(1-(10/length(ham_spam)))
+ham_spam_dtm
+```
+
+N.B., term counts went from ~61,284 and ~37794 to ~2821 and ~3507. Also Sparsity dropped from 100% (rounded) in both DTMs to 95% and 97%. This should help the algorithms that we are about to use to run more efficiently in terms of computer resources. I removed the DTM lines that made DTMs from untidied Corpuses to improve the performance of the program. 
+
+### Summary Statistics of the DTMs
+
+It is good practice to explore the Corpus using the DTMs once they have been initialized. To that end, we can create bar plots of the most frequently used terms in both Corpuses, and some word clouds to get a more intuitive feel for how the Document Classes differ.
+
+
+First we will look at the Spam emails. They seem to make a lot of references to type settings with font, serif, Helvetica, etc. being common.
+
+```{r sum_spam, eval=TRUE}
+spam_freq <-  spam_dtm %>% as.matrix() %>% colSums()
+length(spam_freq) #Should be the same as term count, not document count.
+
+```
+
+```{r}
+spam_freq_ord <- spam_freq %>% order(decreasing = TRUE)
+#spam_freq_ord is a vector of the indicies of spam_freq in order of highest word count to lowest.
+par(las=1)
+#This will create a bar plot of the top 10 words in the spam Corpus
+barplot(spam_freq[spam_freq_ord[1:10]], horiz = TRUE,col=rainbow(10))
+```
+```{r}
+#Spam Cloud
+wordcloud(spam, max.words = 75, random.order = FALSE, random.color = TRUE,colors=palette())
+
+```
+
+
+Next we will look at the Ham emails. These tend to make lots of calendar references with terms like mon, wed, aug,and oct being common.
+```{r sum_ham, eval=TRUE}
+ham_freq <-  ham_dtm %>% as.matrix() %>% colSums()
+length(ham_freq) #Should be the same as term count, not document count.
+ham_freq_ord <- ham_freq %>% order(decreasing = TRUE)
+#ham_freq_ord is a vector of the indicies of ham_freq in order of highest word count to lowest.
+par(las=1)
+#This will create a bar plot of the top 10 words in the ham Corpus
+barplot(ham_freq[ham_freq_ord[1:10]], horiz = TRUE,col=rainbow(10),cex.names=0.7)
+#Ham Cloud
+wordcloud(ham, max.words = 75, random.order = FALSE, random.color = TRUE,colors=palette())
+```
+
+Initially, the top word on both lists was the root, "receiv". I decided to remove that word as in does not contain much information for written communication. It appeared a lot in the headers of the emails before the actual messages. I removed it from both lists in order to improve the effectiveness of the filter. Afterwards, the top word in the ham list was 'spamassassin'. This suggests that these emails have already passed through a spam filter. In creating a spam filter of my own, it seems more rigorous to do so without that word. I opted to remove it in the line of code in the previous block.
+
+We do see a difference in the top words in the Spam DTM vs. the Ham DTM. We can use this as the basis of our spam filter.
+
+
+## Document Analysis
+
+First, we create the container for the RText Tools. Before I removed the root "reciev" which was the top word in both the ham and spam corpuses, the spam filters were about 59% to 64% accurate. I went back to the code to tidy the data and removed 'receiv' from both corpuses. After I did that the accuracy of the Spam filter jumped to 99% with a training set of 2001! I then reduced the training set size to see if I could get similar performance with less in the training set.
+
+A training set of 501 gives about 96% to 99% accuracy, so that seems like a good trade off. We need to begin by creating a container of the data that needs to be input into the models: the dtm, the vector of classifications and the size of the training and test sets. The 'virgin' input is set to false because as that signifies that the data in the test set and training set have corresponding labels.
+
+```{r cont,eval=TRUE}
+# The code below comes from the text Automated Data Collection in R.
+lbls <- as.vector(unlist(meta(ham_spam, type="local", tag = "classification")))
+head(lbls)
+N <- length(lbls)
+container <- create_container(ham_spam_dtm, labels = lbls, trainSize = 1:501,testSize = 502:N,virgin = TRUE)
+```
+
+
+### Support Vector Machine
+
+Now we will use the Support Vector Machine supervised learning model to classify emails in the test set as ham or spam. This technique works by classifying each document as a position vector and it looks for a plane through the phase space that creates the largest distance between the two classes in the training set, here 'spam' emails and 'ham' emails. It then classifies each document in the test set by it's position relative to the plane of separation.
+
+```{r svm, eval=TRUE}
+svm_model <- train_model(container, "SVM")
+svm_result <- classify_model(container,svm_model)
+head(svm_result)
+prop.table(table(svm_result[,1] == lbls[502:N]))
+```
+
+The SVM model gives greater than 99% accuracy, which is outstanding. 
+
+### Random Forest
+
+Next we will use the Random Forest model. The random forest technique by creating multiply decision trees using the training set. It then assigns the data in the test set a classification that is composed of the mode of the results of each individual decision tree. In this model it assigns a probability of the classification based on goodness of fit to individual tree.
+
+```{r tree, eval=TRUE}
+tree_model <- train_model(container, "TREE")
+tree_result <- classify_model(container, tree_model)
+head(tree_result)
+prop.table(table(tree_result[,1] == lbls[502:N]))
+```
+
+We get 96% accuracy with the Random Forest, which is excellent. 
+
+
+### Maximum Entropy
+
+Finally we will use the Maximum Entropy model. This model starts with an assumption that the properties in a population are Normally distributed with a known mean and standard deviation. Max Entropy builds these distributions with the training set. It then assigns a classification with each item in the test set based on which distribution it deviates from the least.
+
+```{r maxent,eval=TRUE}
+maxent_model <- train_model(container, "MAXENT")
+max_result <- classify_model(container, maxent_model)
+head(max_result)
+prop.table(table(max_result[,1] == lbls[502:N]))
+```
+
+Similar to the SVM we get greater than 99% with Max Entropy.
+
+## Summary
+
+* Analysis of word counts in the Spam and Ham emails revealed differences in the most commonly occurring words.
+
+* The removal of the top word root in both lists, 'receiv', increased the accuracy by more than 30% of previously reported results.
+
+* Accuracy of individual supervised machine learning models ranged from 96% to 99%.
+
+
+## Annotated Refenences
+
+* Munzert, Rubba, Mei$\beta$ner, and Nyhuis; Automated Data Collection with R.
+
+
+
