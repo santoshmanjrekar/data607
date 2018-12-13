@@ -1,0 +1,152 @@
+---
+title: "Twitter data extraction code"
+author: "Santosh Manjrekar"
+date: "12/7/2018"
+output: html_document
+---
+
+```{r}
+library('SnowballC')
+library('tm')
+library('twitteR')
+library('syuzhet')
+library('dplyr')
+library('stringr')
+```
+
+### Connect to Twitter
+```{r}
+#twitter_handle_string = "@Aurora_MMJ OR @aurora_invest OR $ACB"
+#twitter_handle_string = "@AMD OR @AMDNews OR @AMDRyzen"
+#twitter_handle_string = "@FB OR @FBNews OR @facebook"
+
+consumer_key <- 'qJcR0eQsnIx9WSCfqpy3J52od'
+consumer_secret <- 'EfNNzIU8z6Df5jdiLctYdwHTBkbz3jPhTMdhEQh6yTfr0xB9P6'
+access_token <- '564938476-jNlPuKtaETTYf6WRJVtc6y5vwxdfJj09svTNkLxt'
+access_secret <- '8lgBOY2Hb1ztabji8E5sHMEhYoNfwt4JbxQo3y0iaqUM3'
+
+#connect to twitter
+setup_twitter_oauth(consumer_key, consumer_secret, access_token, access_secret)
+```
+
+###Search for msft stock for specific date range
+```{r}
+twitter_handle_string = "@@Microsoft OR @MSFTNews"
+#twitter_handle_string = "$MSFT"
+
+fromDate <-'2018-12-11'
+toDate <-'2018-12-12'
+fromDateFile <-paste('MSFT-',fromDate)
+
+#search twitter for given twitter handles
+tweets <- searchTwitter(twitter_handle_string, n =5000, since = fromDate, until= toDate,lang = 'en')
+```
+```{r}
+#Convert list to dataframe
+tweets.raw_df <- twListToDF(tweets)
+
+#Save raw data to file
+raw_csv_file = paste(fromDateFile , '-twitt-raw-data.csv')
+raw_csv_file
+write.csv(tweets.raw_df,raw_csv_file)
+```
+
+###Filter and process the data
+```{r}
+#avoid retweet data
+tweets.df <-subset(tweets.raw_df,isRetweet == 'FALSE')
+raw_filtered_csv_file = paste(fromDateFile , '-twitt-filtered-data.csv')
+write.csv(tweets.df,raw_filtered_csv_file)
+```
+
+
+### Cleanup the twitter data
+```{r}
+#cleanup the twitter data
+nrow(tweets.df)
+tweets.df$text <- gsub("http.*","",tweets.df$text)
+tweets.df$text <- gsub("https.*","",tweets.df$text)
+
+tweets.df$text <- gsub("&amp", "", tweets.df$text)
+tweets.df$text = gsub("(RT|via)((?:\\b\\W*@\\w+)+)", "", tweets.df$text)
+tweets.df$text = gsub("@\\w+", "", tweets.df$text)
+tweets.df$text = gsub("[[:punct:]]", "", tweets.df$text)
+tweets.df$text = gsub("[[:digit:]]", "", tweets.df$text)
+tweets.df$text = gsub("http\\w+", "", tweets.df$text)
+tweets.df$text = gsub("[ \t]{2,}", "", tweets.df$text)
+tweets.df$text = gsub("^\\s+|\\s+$", "", tweets.df$text) 
+
+# Take out retweet header, there is only one
+tweets.df$text <- str_replace(tweets.df$text,"RT @[a-z,A-Z]*: ","")
+# Get rid of hashtags
+tweets.df$text <- str_replace_all(tweets.df$text,"#[a-z,A-Z]*","")
+# Get rid of references to other screennames
+tweets.df$text <- str_replace_all(tweets.df$text,"@[a-z,A-Z]*","")  
+```
+
+
+###run sentiment analysis
+```{r}
+word.df <- as.vector(tweets.df$text)
+
+#tweets.emotion
+emotion.df <- get_nrc_sentiment(word.df)
+tweets.emotion <- cbind (tweets.df, emotion.df)
+
+
+sent.value <- get_sentiment(word.df)
+
+most.positive <- word.df[sent.value == max(sent.value)]
+#most.positive
+
+most.negative <- word.df[sent.value == min(sent.value)]
+#most.negative
+#sent.value
+```
+
+```{r}
+positive.tweets <- word.df[sent.value > 0]
+negative.tweets <- word.df[sent.value < 0]
+neutral.tweets <- word.df[sent.value == 0]
+
+
+
+category_senti <- ifelse(sent.value < 0, "Negative", ifelse(sent.value > 0, "Positive", "Neutral"))
+
+tweets.emotion.senti <- cbind(tweets.emotion, category_senti, sent.value)
+
+
+#tweets.emotion.senti
+twits_emotion_senti_csv_file = paste(fromDateFile , '-twitt-emotion-senti-data.csv')
+write.csv(tweets.emotion.senti,twits_emotion_senti_csv_file)
+
+tweets.emotion.senti$created <- as.Date(tweets.emotion.senti$created)
+
+
+```
+
+###Summarize twitter data and write it to the file
+```{r}
+tweets.daily.summary<-tweets.emotion.senti %>% 
+  group_by(tweets.emotion.senti$created) %>% 
+  summarise(net_sent = mean(tweets.emotion.senti$sent.value), 
+            net_anger = mean(tweets.emotion.senti$anger),
+            net_anticipation = mean(tweets.emotion.senti$anticipation),
+            net_disgust = mean(tweets.emotion.senti$disgust),
+            net_fear = mean(tweets.emotion.senti$fear),
+            net_joy = mean(tweets.emotion.senti$joy),
+            net_sadness = mean(tweets.emotion.senti$sadness),
+            net_surprise = mean(tweets.emotion.senti$surprise),
+            net_trust = mean(tweets.emotion.senti$trust),
+            net_negative = mean(tweets.emotion.senti$negative),
+            net_positive = mean(tweets.emotion.senti$positive)) 
+
+twits_daily_summary_file = paste(fromDateFile , '-twitt-daily-summary.csv')
+
+write.csv(tweets.daily.summary,twits_daily_summary_file)             
+
+```
+
+
+
+
