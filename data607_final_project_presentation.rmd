@@ -1,0 +1,192 @@
+---
+title: "DATA 607 Final Project"
+author: "Santosh Manjrekar & Robert Lauto"
+date: "12/12/2018"
+output: html_document
+---
+
+```{r}
+suppressWarnings(suppressMessages(library('SnowballC')))
+suppressWarnings(suppressMessages(library('tm')))
+suppressWarnings(suppressMessages(library('twitteR')))
+suppressWarnings(suppressMessages(library('syuzhet')))
+suppressWarnings(suppressMessages(library('dplyr')))
+suppressWarnings(suppressMessages(library('stringr')))
+suppressWarnings(suppressMessages(library(ggplot2)))
+suppressWarnings(suppressMessages(library(dplyr)))
+suppressWarnings(suppressMessages(library(tidyr)))
+suppressWarnings(suppressMessages(library('wordcloud')))
+```
+
+###Project description- Analyze the impact of twitter sentiment analysis on stock price
+
+In this project we will try to assess if there is any relationship between twitter sentiment on stock price price variation.
+
+###Team Members
+
+Santosh Manjrekar,
+Robert Lauto 
+
+
+
+
+###Data Extraction
+
+We used twitter API to extract the data. Mainly extracted the data for microsoft related twitter handles. Using the twitter API you can search and extract data for certain duration. We were able to get the data for last 10 days. Data was saved in the csv file per day. Please refer to the data extraction program on below github URl.
+
+
+[GitHub location of Twitter Data Extraction](https://github.com/santoshmanjrekar/data607/blob/master/twitter_data_extraction.rmd)
+
+
+Here is twitter dta extracted for a day.
+
+```{r}
+df_msft_twit_data = read.csv("C:\\santosh\\learning\\CUNY\\courses\\DATA607\\final-project\\msft\\data\\MSFT- 2018-12-11 -twitt-emotion-senti-data.csv")
+head(df_msft_twit_data)
+```
+
+
+###Data Processing or tidying
+
+Retwitted twits were filtered out. We used library syuzhet for sentiment analysis. This library gives different emotion score for the each tweet. Here is the sample of the emotion score
+
+
+We grouped the data per day and average emotion score was calculated for the gathered twitts for the given day. So daily sentiment and emotion score was calculated.
+
+Here is the sample 
+```{r}
+df_msft_daily_summary = read.csv("C:\\santosh\\learning\\CUNY\\courses\\DATA607\\final-project\\msft\\MSFT-twitt-final-summary.csv")
+head(df_msft_daily_summary)
+
+```
+
+
+###Data Analysis
+
+Here is the graph of the Positive and Negative sentiments and emotion scores for each day. Positive sentiments and positive emotions show the same pattern..similary negative sentiment and negative emitions follow the same pattern.
+```{r}
+ggplot(df_msft_daily_summary, aes(x = data_date)) + 
+  geom_line(aes(y = net_sent, group=1), colour="red") +
+  geom_line(aes(y = net_anger, group=2), colour="yellow") +
+  geom_line(aes(y = net_anticipation, group=3), colour="green") +
+  geom_line(aes(y = net_disgust, group=4), colour="chocolate") +
+  geom_line(aes(y = net_fear, group=5), colour="black") +
+  geom_line(aes(y = net_joy, group=6), colour="slateblue") +
+  geom_line(aes(y = net_sadness, group=7), colour="darkviolet") +
+  geom_line(aes(y = net_surprise, group=8), colour="orange") +
+  geom_line(aes(y = net_trust, group=9), colour="skyblue") +
+  geom_line(aes(y = net_negative, group=10), colour="chocolate") +
+  geom_line(aes(y = net_positive, group=11), colour="tomato") +
+  
+#geom_line(aes(y = Stock_Price, group=12), colour="darkviolet") +
+ #geom_line(aes(y = No_Twitts, group=13), colour="red") +
+ #geom_line(aes(y = Volume, group=14), colour="slateblue") +
+  
+  ylab(label="Score") + 
+  xlab("Data Date")
+
+```
+
+
+####Positive sentiment word cloud
+
+```{r}
+
+df_positive <-df_msft_twit_data[df_msft_twit_data$sent.value > 3,]
+nrow(df_positive)
+#Show wordcloud
+
+positive_corp <- Corpus(VectorSource(df_positive$text))
+
+#positive_corp <- positive_corp %>% tm_map(content_transformer(PlainTextDocument))
+positive_corp <- positive_corp%>% tm_map(content_transformer(removePunctuation))
+positive_corp <- positive_corp %>% tm_map(content_transformer(tolower))
+positive_corp <-tm_map(positive_corp,removeWords, c("the","and","that","this","was","with","for","your"))
+positive_corp <- positive_corp %>% tm_map(content_transformer(removeNumbers))
+positive_corp <- positive_corp %>% tm_map(content_transformer(stemDocument),  language = 'english') 
+#Stemming seems to truncate words
+
+wordcloud(positive_corp, max.words = 75, random.order = FALSE, random.color = TRUE,colors=palette())
+
+#positive_corp_dtm <- positive_corp %>% DocumentTermMatrix()
+#positive_corp_dtm
+#positive_corp_freq <-  positive_corp_dtm %>% as.matrix() %>% colSums()
+#length(positive_corp_freq) #Should be the same as term count, not document count.
+#positive_corp_freq_ord <- positive_corp_freq %>% order(decreasing = TRUE)
+
+
+```
+
+
+
+
+####Negative sentiment word cloud
+
+Looks like many people not happy with windows's updates.
+```{r}
+
+df_positive <-df_msft_twit_data[df_msft_twit_data$sent.value < -1,]
+nrow(df_positive)
+#Show wordcloud
+
+positive_corp <- Corpus(VectorSource(df_positive$text))
+
+#positive_corp <- positive_corp %>% tm_map(content_transformer(PlainTextDocument))
+positive_corp <- positive_corp%>% tm_map(content_transformer(removePunctuation))
+positive_corp <- positive_corp %>% tm_map(content_transformer(tolower))
+positive_corp <- positive_corp %>% tm_map(content_transformer(removeNumbers))
+positive_corp <-tm_map(positive_corp,removeWords, c("the","and","that","this","was","with","for","your"))
+positive_corp <- positive_corp %>% tm_map(content_transformer(stemDocument),  language = 'english') 
+#Stemming seems to truncate words
+
+wordcloud(positive_corp, max.words = 75, random.order = FALSE, random.color = TRUE,colors=palette())
+
+#positive_corp_dtm <- positive_corp %>% DocumentTermMatrix()
+#positive_corp_dtm
+#positive_corp_freq <-  positive_corp_dtm %>% as.matrix() %>% colSums()
+#length(positive_corp_freq) #Should be the same as term count, not document count.
+#positive_corp_freq_ord <- positive_corp_freq %>% order(decreasing = TRUE)
+
+
+```
+
+
+
+###Twitter sentiment and stock price analysis
+
+```{r}
+msft <- read.csv('C:\\santosh\\learning\\CUNY\\courses\\DATA607\\final-project\\msft\\MSFT.csv')
+msft$Date <- as.Date(msft$Date)
+msft
+df_msft_daily_summary$data_date <- as.Date(df_msft_daily_summary$data_date)
+stock_n_sent <- merge(df_msft_daily_summary, msft, by.x = 'data_date', by.y = 'Date')
+microsoft_model <- lm(Close ~ net_sent, stock_n_sent)
+
+ggplotRegression <- function (fit) {
+
+require(ggplot2)
+
+ggplot(fit$model, aes_string(x = names(fit$model)[2], y = names(fit$model)[1])) + 
+  geom_point() +
+  stat_smooth(method = "lm", col = "red") +
+  labs(title = paste("Adj R2 = ",signif(summary(fit)$adj.r.squared, 5),
+                     "Intercept =",signif(fit$coef[[1]],5 ),
+                     " Slope =",signif(fit$coef[[2]], 5),
+                     " P =",signif(summary(fit)$coef[2,4], 5)))
+}
+cor(stock_n_sent$Close, stock_n_sent$net_sent)
+ggplotRegression(microsoft_model)
+```
+```{r}
+summary(microsoft_model)
+```
+###Conclusions
+
+*There is not significant corelation between sentiment score and stock price.
+
+*We would ahve gathered more data and that might have helped us for better analysis
+
+*There are some other factors associated with stock price other than twitts and tat will be further study.
+
+*This process was built keeping in mind to find the corelation of twitter sentiment and stock price but this process can be used to find out the response twitts for any new product launch and product reviews or similar
+use cases
